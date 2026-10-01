@@ -1,0 +1,12 @@
+name: PR
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  checks:
+    uses: Wickedsoni/.github/.github/workflows/pr-checks.yml@main
+    permissions:
+      contents: read
+      pull-requests: write

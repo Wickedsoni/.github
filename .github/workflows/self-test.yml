@@ -1,0 +1,41 @@
+# Checks the reusable workflows in this repo whenever they change.
+name: Self-test
+
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/**", "starters/**", "tests/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  actionlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: actionlint
+        run: |
+          bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+          ./actionlint -color .github/workflows/*.yml starters/*/.github/workflows/*.yml
+
+  node:
+    uses: ./.github/workflows/node-ci.yml
+    with:
+      working-directory: tests/node-fixture
+
+  android:
+    uses: ./.github/workflows/android-ci.yml
+    with:
+      repository: Wickedsoni/Wifilens
+      java-version: "17"
+      tasks: ":core:rf:test :app:assembleDebug"
+
+  codeql:
+    uses: ./.github/workflows/codeql.yml
+    permissions:
+      contents: read
+      security-events: write
+    with:
+      languages: '[{"language":"actions","build-mode":"none"}]'

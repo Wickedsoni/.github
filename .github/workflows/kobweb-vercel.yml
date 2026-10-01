@@ -1,0 +1,139 @@
+# Reusable: export a Kobweb site to static files and deploy it to Vercel.
+# Vercel can't build Kotlin/Gradle itself, so GitHub builds and Vercel only serves the output.
+#
+#   jobs:
+#     deploy:
+#       uses: Wickedsoni/.github/.github/workflows/kobweb-vercel.yml@main
+#       with:
+#         site-dir: site
+#         production: ${{ github.ref == 'refs/heads/main' }}
+#       secrets: inherit
+#
+# Secrets: VERCEL_TOKEN, plus VERCEL_ORG_ID and VERCEL_PROJECT_ID. The org and project IDs are required for
+# team scopes, otherwise the CLI fails with "User not found". Find them in .vercel/project.json after
+# running `vercel link` once.
+name: Kobweb to Vercel
+
+on:
+  workflow_call:
+    inputs:
+      site-dir:
+        description: Folder with the Kobweb site module (where `kobweb run` works).
+        type: string
+        default: site
+      gradle-dir:
+        description: Folder with gradlew. Defaults to the parent of site-dir.
+        type: string
+        default: ""
+      kobweb-cli-version:
+        type: string
+        default: "0.9.23"
+      java-version:
+        type: string
+        default: "21"
+      production:
+        type: boolean
+        default: true
+      extra-files:
+        description: Space-separated paths (relative to the repo root) copied next to the export, e.g. "api vercel.json".
+        type: string
+        default: ""
+    secrets:
+      VERCEL_TOKEN:
+        required: true
+      VERCEL_ORG_ID:
+        required: false
+      VERCEL_PROJECT_ID:
+        required: false
+    outputs:
+      url:
+        description: Deployment URL
+        value: ${{ jobs.deploy.outputs.url }}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vercel-${{ github.workflow }}-${{ inputs.production }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: ${{ inputs.java-version }}
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Resolve folders
+        id: dirs
+        run: |
+          site="${{ inputs.site-dir }}"
+          gradle="${{ inputs.gradle-dir }}"
+          [ -z "$gradle" ] && gradle="$(dirname "$site")"
+          echo "gradle=$gradle" >> "$GITHUB_OUTPUT"
+          echo "module=$(basename "$site")" >> "$GITHUB_OUTPUT"
+
+      # Kobweb renders each page in a headless browser during export; cache that download.
+      - name: Browser cache id
+        id: browser
+        working-directory: ${{ steps.dirs.outputs.gradle }}
+        run: |
+          chmod +x ./gradlew
+          echo "value=$(./gradlew -q :${{ steps.dirs.outputs.module }}:kobwebBrowserCacheId)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.browser.outputs.value }}
+
+      - name: Install Kobweb CLI
+        env:
+          V: ${{ inputs.kobweb-cli-version }}
+        run: |
+          wget -q "https://github.com/varabyte/kobweb-cli/releases/download/v${V}/kobweb-${V}.zip"
+          unzip -q "kobweb-${V}.zip" -d "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/kobweb-${V}/bin" >> "$GITHUB_PATH"
+
+      - name: Export static site
+        working-directory: ${{ inputs.site-dir }}
+        run: kobweb export --notty --layout static
+
+      - name: Prepare deploy folder
+        run: |
+          out="$RUNNER_TEMP/deploy"
+          mkdir -p "$out"
+          cp -r "${{ inputs.site-dir }}/.kobweb/site/." "$out/"
+          find "$out" -name "*.map" -delete   # keep Kotlin sources out of the public site
+          for p in ${{ inputs.extra-files }}; do cp -r "$p" "$out/"; done
+          echo "DEPLOY_DIR=$out" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+
+      - name: Deploy to Vercel
+        id: deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        working-directory: ${{ env.DEPLOY_DIR }}
+        run: |
+          if [ -n "$ORG_ID" ] && [ -n "$PROJECT_ID" ]; then
+            export VERCEL_ORG_ID="$ORG_ID" VERCEL_PROJECT_ID="$PROJECT_ID"
+          fi
+          flag=""
+          [ "${{ inputs.production }}" = "true" ] && flag="--prod"
+          url=$(npx --yes vercel@latest deploy $flag --yes --token "$VERCEL_TOKEN")
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "### Deployed to Vercel ${flag:+(production)}" >> "$GITHUB_STEP_SUMMARY"
+          echo "$url" >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,37 @@
+name: Bug report
+description: Something doesn't work the way it should.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open ...
+        2. Tap ...
+        3. See ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: App / library version
+      placeholder: v1.2.0 or commit SHA
+  - type: input
+    id: device
+    attributes:
+      label: Device and OS
+      placeholder: Pixel 8, Android 16 / Chrome 140 on Windows
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Logcat output, stack traces or screenshots. Text is pasted as code automatically.
+      render: shell

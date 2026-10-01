@@ -1,0 +1,13 @@
+name: Stale
+
+on:
+  schedule:
+    - cron: "30 1 * * 1"
+  workflow_dispatch:
+
+jobs:
+  stale:
+    uses: Wickedsoni/.github/.github/workflows/stale.yml@main
+    permissions:
+      issues: write
+      pull-requests: write

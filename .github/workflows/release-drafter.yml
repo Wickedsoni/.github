@@ -1,0 +1,31 @@
+# Reusable: keep a draft GitHub Release with grouped notes, updated on every merge to main.
+# Publishing the draft creates the tag, which triggers android-release.yml if the repo uses it.
+#
+#   on:
+#     push:
+#       branches: [main]
+#   jobs:
+#     draft:
+#       uses: Wickedsoni/.github/.github/workflows/release-drafter.yml@main
+#       permissions:
+#         contents: write
+#         pull-requests: read
+#
+# Needs .github/release-drafter.yml in the calling repo with one line: `_extends: .github`
+# (the shared template lives in this repo).
+name: Release drafter
+
+on:
+  workflow_call:
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  draft:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: release-drafter/release-drafter@v7
+        env:
+          GITHUB_TOKEN: ${{ github.token }}

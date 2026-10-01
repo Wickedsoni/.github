@@ -1,0 +1,13 @@
+# Push a tag like v1.2.0 (or publish the release draft) to build and attach the APK + AAB.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  release:
+    uses: Wickedsoni/.github/.github/workflows/android-release.yml@main
+    permissions:
+      contents: write
+    secrets: inherit

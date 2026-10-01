@@ -1,0 +1,61 @@
+# Reusable: CodeQL security scan. Free on public repos; private repos need GitHub Advanced Security.
+#
+#   jobs:
+#     codeql:
+#       uses: Wickedsoni/.github/.github/workflows/codeql.yml@main
+#       permissions:
+#         contents: read
+#         security-events: write
+#       with:
+#         languages: '[{"language":"java-kotlin","build-mode":"autobuild"}]'
+#
+# Kotlin needs a build (autobuild works for standard Gradle projects). JS/TS, Python and Actions use "none".
+name: CodeQL
+
+on:
+  workflow_call:
+    inputs:
+      languages:
+        description: JSON list of {language, build-mode}.
+        type: string
+        default: '[{"language":"java-kotlin","build-mode":"autobuild"},{"language":"actions","build-mode":"none"}]'
+      java-version:
+        type: string
+        default: "21"
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  analyze:
+    name: ${{ matrix.language }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(inputs.languages) }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - if: matrix.language == 'java-kotlin'
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: ${{ inputs.java-version }}
+
+      - if: matrix.language == 'java-kotlin'
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: true
+
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          queries: security-and-quality
+
+      - uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:${{ matrix.language }}

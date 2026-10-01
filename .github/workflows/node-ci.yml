@@ -1,0 +1,84 @@
+# Reusable: install, lint, typecheck, test and build a Node/JS/TS project.
+# Picks npm, pnpm, yarn or bun from the lockfile and skips any script the package.json doesn't define.
+#
+#   jobs:
+#     ci:
+#       uses: Wickedsoni/.github/.github/workflows/node-ci.yml@main
+name: Node CI
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        type: string
+        default: "24"
+      working-directory:
+        type: string
+        default: "."
+      scripts:
+        description: package.json scripts to run, in order, when present.
+        type: string
+        default: "lint typecheck test build"
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Detect package manager
+        id: pm
+        run: |
+          pm=npm; lock=""
+          if   [ -f pnpm-lock.yaml ]; then pm=pnpm; lock=pnpm-lock.yaml
+          elif [ -f bun.lock ] || [ -f bun.lockb ]; then pm=bun
+          elif [ -f yarn.lock ]; then pm=yarn; lock=yarn.lock
+          elif [ -f package-lock.json ]; then lock=package-lock.json; fi
+          echo "name=$pm" >> "$GITHUB_OUTPUT"
+          # setup-node can only cache when a lockfile exists (and never for bun)
+          if [ -n "$lock" ]; then echo "cache=$pm" >> "$GITHUB_OUTPUT"; echo "lock=${{ inputs.working-directory }}/$lock" >> "$GITHUB_OUTPUT"; fi
+
+      - if: steps.pm.outputs.name == 'pnpm'
+        uses: pnpm/action-setup@v6
+
+      - if: steps.pm.outputs.name == 'bun'
+        uses: oven-sh/setup-bun@v2
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: ${{ steps.pm.outputs.cache }}
+          cache-dependency-path: ${{ steps.pm.outputs.lock }}
+
+      - name: Install
+        env:
+          PM: ${{ steps.pm.outputs.name }}
+        run: |
+          case "$PM" in
+            pnpm) pnpm install --frozen-lockfile ;;
+            bun)  bun install --frozen-lockfile ;;
+            yarn) corepack enable; yarn install --immutable || yarn install --frozen-lockfile ;;
+            npm)  if [ -f package-lock.json ]; then npm ci; else npm install; fi ;;
+          esac
+
+      - name: Run scripts
+        env:
+          PM: ${{ steps.pm.outputs.name }}
+          SCRIPTS: ${{ inputs.scripts }}
+        run: |
+          for s in $SCRIPTS; do
+            if node -e "process.exit(require('./package.json').scripts?.['$s'] ? 0 : 1)"; then
+              echo "::group::$PM run $s"
+              $PM run "$s"
+              echo "::endgroup::"
+            else
+              echo "No \"$s\" script, skipping."
+            fi
+          done

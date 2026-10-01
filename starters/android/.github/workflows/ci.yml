@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    uses: Wickedsoni/.github/.github/workflows/android-ci.yml@main
+    # with:
+    #   tasks: "assembleDebug lintDebug testDebugUnitTest"
+    #   java-version: "21"
+
+  codeql:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork
+    uses: Wickedsoni/.github/.github/workflows/codeql.yml@main
+    permissions:
+      contents: read
+      security-events: write

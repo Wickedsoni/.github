@@ -1,0 +1,12 @@
+name: Release drafter
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  draft:
+    uses: Wickedsoni/.github/.github/workflows/release-drafter.yml@main
+    permissions:
+      contents: write
+      pull-requests: read

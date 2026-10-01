@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    uses: Wickedsoni/.github/.github/workflows/node-ci.yml@main
+    # with:
+    #   node-version: "24"
+    #   scripts: "lint typecheck test build"
+
+  codeql:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork
+    uses: Wickedsoni/.github/.github/workflows/codeql.yml@main
+    permissions:
+      contents: read
+      security-events: write
+    with:
+      languages: '[{"language":"javascript-typescript","build-mode":"none"},{"language":"actions","build-mode":"none"}]'

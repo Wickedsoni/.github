@@ -1,0 +1,78 @@
+# Reusable: build, lint and unit-test an Android (Gradle) project.
+#
+#   jobs:
+#     ci:
+#       uses: Wickedsoni/.github/.github/workflows/android-ci.yml@main
+#
+# Reports and the debug APK are uploaded as run artifacts.
+name: Android CI
+
+on:
+  workflow_call:
+    inputs:
+      java-version:
+        type: string
+        default: "21"
+      working-directory:
+        description: Folder that holds gradlew.
+        type: string
+        default: "."
+      tasks:
+        description: Gradle tasks to run.
+        type: string
+        default: "assembleDebug lintDebug testDebugUnitTest"
+      upload-apk:
+        type: boolean
+        default: true
+      repository:
+        description: Repo to build. Leave empty for the calling repo.
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          repository: ${{ inputs.repository || github.repository }}
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: ${{ inputs.java-version }}
+
+      # Caches Gradle and the wrapper; only the default branch writes the cache.
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Gradle ${{ inputs.tasks }}
+        run: |
+          chmod +x ./gradlew
+          ./gradlew ${{ inputs.tasks }} --stacktrace
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: reports
+          path: |
+            ${{ inputs.working-directory }}/**/build/reports/
+            ${{ inputs.working-directory }}/**/build/test-results/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload debug APK
+        if: inputs.upload-apk
+        uses: actions/upload-artifact@v7
+        with:
+          name: debug-apk
+          path: ${{ inputs.working-directory }}/**/build/outputs/apk/debug/*.apk
+          if-no-files-found: ignore
+          retention-days: 14

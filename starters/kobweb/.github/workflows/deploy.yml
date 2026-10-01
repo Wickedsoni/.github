@@ -1,0 +1,19 @@
+# main → production on Vercel; pull requests → preview deployment (link in the run summary).
+# Secrets: VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.head.repo.fork
+    uses: Wickedsoni/.github/.github/workflows/kobweb-vercel.yml@main
+    with:
+      site-dir: site
+      production: ${{ github.ref == 'refs/heads/main' }}
+      # extra-files: "vercel.json api"
+    secrets: inherit
