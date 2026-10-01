@@ -1,3 +1,5 @@
+<img src="https://raw.githubusercontent.com/Wickedsoni/Wickedsoni/main/assets/ping/ping-code.svg" alt="Ping, my mascot, typing" width="130" align="right">
+
 # Shared GitHub setup
 
 [![Self-test](https://github.com/Wickedsoni/.github/actions/workflows/self-test.yml/badge.svg)](https://github.com/Wickedsoni/.github/actions/workflows/self-test.yml)
